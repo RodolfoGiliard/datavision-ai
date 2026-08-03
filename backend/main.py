@@ -1,5 +1,9 @@
 ﻿from fastapi import FastAPI
 from app.api.v1.api import api_router
+from app.core.database import Base, engine
+
+# Cria as tabelas do banco de dados na inicialização
+Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
     title="DataVision AI API",
