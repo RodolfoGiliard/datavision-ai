@@ -1,0 +1,16 @@
+﻿--- LOJA FICTICIA: TECHSTORE BRASIL ---
+
+1. PRODUTOS E PRECOS:
+- Notebook Gamer Ultra: R$ 4.500,00 (Estoque: 15 unidades)
+- Monitor 144Hz 27 polegadas: R$ 1.200,00 (Estoque: 8 unidades)
+- Teclado Mecanico RGB: R$ 250,00 (Estoque: 30 unidades)
+- Mouse Sem Fio Ergonomico: R$ 120,00 (Estoque: 50 unidades)
+
+2. POLITICA DE FRETE E ENTREGA:
+- Frete Gratis para compras acima de R$ 300,00 para todo o Brasil.
+- Prazo de entrega: 3 a 5 dias uteis para capitais, 7 a 10 dias para interior.
+
+3. GARANTIA E TROCAS:
+- Todos os produtos possuem 12 meses de garantia contra defeitos de fabricacao.
+- Devolucoes por arrependimento podem ser feitas em ate 7 dias apos o recebimento.
+- Suporte ao cliente: suporte@techstorebrasil.com.br
