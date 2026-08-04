@@ -1,0 +1,7 @@
+﻿fastapi
+uvicorn
+nicegui
+plotly
+httpx
+pyodbc
+pandas
