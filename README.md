@@ -1,15 +1,17 @@
 # 🚀 DataVision AI — RAG & SQL Engine
 
-O **DataVision AI** é um sistema completo para consulta em tempo real a banco de dados **SQL Server** e análise de documentos (PDF/TXT) utilizando IA local (**Ollama / Phi-3**).
+**DataVision AI** es un sistema completo para la consulta en tiempo real de bases de datos **SQL Server** y el análisis inteligente de documentos (PDF/TXT) utilizando IA local (**Ollama / Phi-3**).
 
-## 🛠️ Tecnologias Utilizadas
-- **Backend:** Python + FastAPI
-- **Frontend:** NiceGUI
-- **Banco de Dados:** SQL Server (`dbo.produtos`)
-- **LLM Local:** Ollama (Modelo: `phi3`)
-- **Bibliotecas:** SQLAlchemy, PyPDF, httpx
+## 🛠️ Tecnologías Utilizadas
 
-## ⚡ Recursos
-- **Text-to-SQL Otimizado:** Respostas instantâneas para cálculos de faturamento, produto mais caro/barato e agregação de dados.
-- **RAG Local:** Leitura e análise privada de documentos PDF e TXT.
-- **Interface Moderna:** Chat interativo de alta performance.
+* **Backend:** Python + FastAPI
+* **Frontend:** NiceGUI
+* **Base de Datos:** SQL Server (`dbo.produtos`)
+* **LLM Local:** Ollama (Modelo: `phi3`)
+* **Librerías:** SQLAlchemy, PyPDF, httpx
+
+## ⚡ Características
+
+* **Text-to-SQL Optimizado:** Respuestas instantáneas para cálculos de facturación, producto más caro/barato y agregación de datos.
+* **RAG Local:** Lectura y análisis privado de documentos PDF y TXT sin enviar datos a la nube.
+* **Interfaz Moderna:** Chat interactivo de alto rendimiento.
