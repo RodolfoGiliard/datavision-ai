@@ -1,18 +1,16 @@
 ﻿from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import create_engine, text
-import requests
+import httpx
 import io
 from pypdf import PdfReader
 
-# Inicialização da aplicação FastAPI
 app = FastAPI(
     title="DataVision AI - RAG & SQL API",
-    description="API para leitura de arquivos (PDF/TXT) e consulta direta ao SQL Server via Ollama/Phi-3",
+    description="API para leitura de arquivos (PDF/TXT) e consulta direta ao SQL Server",
     version="2.0.0"
 )
 
-# Configuração do Middleware CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -21,10 +19,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# URL do endpoint do Ollama local
 OLLAMA_URL = "http://localhost:11434/api/generate"
 
-# Configuração de Conexão com o SQL Server (Ajuste o SERVER se seu SQL Express usar outro nome)
 SERVER = 'localhost'  
 DATABASE = 'newstore'
 DATABASE_URL = f"mssql+pyodbc://@{SERVER}/{DATABASE}?driver=ODBC+Driver+17+for+SQL+Server&trusted_connection=yes"
@@ -42,9 +38,9 @@ def read_root():
 
 
 # ==========================================
-# ENDPOINT 1: PROCESSAMENTO DE ARQUIVOS (PDF / TXT)
+# ENDPOINT 1: RAG (PDF / TXT)
 # ==========================================
-@app.post("/api/rag/ask-document", summary="Faz perguntas baseadas em um arquivo enviado (PDF ou TXT)")
+@app.post("/api/rag/ask-document")
 async def ask_document(
     file: UploadFile = File(...),
     question: str = Form(...)
@@ -53,7 +49,6 @@ async def ask_document(
         contents = await file.read()
         document_text = ""
 
-        # Leitura de PDF
         if file.filename.lower().endswith(".pdf"):
             pdf_file = io.BytesIO(contents)
             reader = PdfReader(pdf_file)
@@ -61,104 +56,111 @@ async def ask_document(
                 extracted_page_text = page.extract_text()
                 if extracted_page_text:
                     document_text += extracted_page_text + "\n"
-
-        # Leitura de TXT
         elif file.filename.lower().endswith(".txt"):
             document_text = contents.decode("utf-8")
-
         else:
-            raise HTTPException(
-                status_code=400, 
-                detail="Formato não suportado. Envie um arquivo .txt ou .pdf."
-            )
+            raise HTTPException(status_code=400, detail="Formato não suportado. Envie .txt ou .pdf.")
 
         if not document_text.strip():
-            raise HTTPException(
-                status_code=400, 
-                detail="Não foi possível extrair texto digital deste arquivo."
-            )
+            raise HTTPException(status_code=400, detail="Arquivo sem texto legível.")
 
-        prompt = f"""Você é um assistente de dados. Responda à pergunta do usuário baseando-se estritamente no documento fornecido abaixo.
+        prompt = f"""Você é um assistente de dados direto e objetivo.
+REGRAS:
+1. Responda apenas com base no documento fornecido.
+2. Seja direto e resumido (máximo 3 frases).
+3. NUNCA gere código ou scripts.
 
 Documento:
-{document_text}
+{document_text[:3000]}
 
-Pergunta:
-{question}
-
+Pergunta: {question}
 Resposta:"""
 
         payload = {
             "model": "phi3",
             "prompt": prompt,
-            "stream": False
+            "stream": False,
+            "options": {"num_predict": 150, "temperature": 0.1}
         }
 
-        response = requests.post(OLLAMA_URL, json=payload)
-        response.raise_for_status()
+        async with httpx.AsyncClient(timeout=120.0) as client:
+            response = await client.post(OLLAMA_URL, json=payload)
+            response.raise_for_status()
+            res_json = response.json()
 
         return {
             "status": "success",
-            "source": "Arquivo " + file.filename,
+            "source": f"Arquivo {file.filename}",
             "question": question,
-            "answer": response.json().get("response", "")
+            "answer": res_json.get("response", "").strip()
         }
 
-    except requests.exceptions.RequestException as e:
-        raise HTTPException(status_code=500, detail=f"Erro no Ollama: {str(e)}")
-    except HTTPException as e:
-        raise e
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erro ao processar arquivo: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 # ==========================================
-# ENDPOINT 2: CONSULTA DIRETA AO SQL SERVER
+# ENDPOINT 2: SQL SERVER (RESPOSTA EXATA E INSTANTÂNEA)
 # ==========================================
-@app.post("/api/sql/ask-products", summary="Faz perguntas diretas na tabela de produtos do SQL Server")
+@app.post("/api/sql/ask-products")
 async def ask_sql_products(question: str = Form(...)):
     if not engine:
-        raise HTTPException(status_code=500, detail="Conexão com o banco SQL não foi configurada.")
+        raise HTTPException(status_code=500, detail="Erro de conexão com o banco SQL.")
         
     try:
-        # Busca ultra-rápida na tabela de produtos do banco newstore
-        query = text("SELECT id_produto, nome_produto, categoria, tamanho, cor, preco, custo FROM dbo.produtos")
+        q = question.lower()
         
         with engine.connect() as connection:
-            result = connection.execute(query)
-            rows = result.fetchall()
-            dados_sql = "\n".join([str(dict(row._mapping)) for row in rows])
+            # 1. PERGUNTA: PRODUTO MAIS CARO
+            if "mais caro" in q or "maior preco" in q or "maior preço" in q:
+                query = text("SELECT TOP 1 nome_produto, preco FROM dbo.produtos ORDER BY preco DESC")
+                res = connection.execute(query).fetchone()
+                if res:
+                    ans = f"O produto mais caro é o **{res.nome_produto}**, custando **R$ {res.preco:.2f}**."
+                else:
+                    ans = "Nenhum produto encontrado no banco."
 
-        if not dados_sql:
-            raise HTTPException(status_code=404, detail="Nenhum produto encontrado no banco de dados.")
+            # 2. PERGUNTA: PRODUTO MAIS BARATO
+            elif "mais barato" in q or "menor preco" in q or "menor preço" in q:
+                query = text("SELECT TOP 1 nome_produto, preco FROM dbo.produtos ORDER BY preco ASC")
+                res = connection.execute(query).fetchone()
+                if res:
+                    ans = f"O produto mais barato é o **{res.nome_produto}**, custando **R$ {res.preco:.2f}**."
+                else:
+                    ans = "Nenhum produto encontrado no banco."
 
-        prompt = f"""Você é um assistente de dados. Responda à pergunta do usuário utilizando os dados do banco SQL abaixo.
+            # 3. PERGUNTA: FATURAMENTO / TOTAL / SOMA
+            elif "faturamento" in q or "total" in q or "soma" in q:
+                query = text("SELECT SUM(preco) as total, COUNT(*) as qtd FROM dbo.produtos")
+                res = connection.execute(query).fetchone()
+                if res and res.total is not None:
+                    ans = f"O faturamento total estimado vendendo todos os {res.qtd} produtos é de **R$ {res.total:.2f}**."
+                else:
+                    ans = "Não foi possível calcular o faturamento."
 
-Dados do Banco SQL (Tabela dbo.produtos):
-{dados_sql}
-
-Pergunta do Usuário:
-{question}
-
-Resposta:"""
-
-        payload = {
-            "model": "phi3",
-            "prompt": prompt,
-            "stream": False
-        }
-
-        response = requests.post(OLLAMA_URL, json=payload)
-        response.raise_for_status()
+            # 4. OUTRAS PERGUNTAS (CONSULTA O OLLAMA)
+            else:
+                query = text("SELECT TOP 10 nome_produto, categoria, preco FROM dbo.produtos")
+                rows = connection.execute(query).fetchall()
+                dados = "\n".join([f"- {r.nome_produto} (R$ {r.preco})" for r in rows])
+                
+                prompt = f"Com base nestes produtos:\n{dados}\n\nResponda diretamente em 1 frase: {question}"
+                payload = {
+                    "model": "phi3",
+                    "prompt": prompt,
+                    "stream": False,
+                    "options": {"num_predict": 80, "temperature": 0.0}
+                }
+                async with httpx.AsyncClient(timeout=60.0) as client:
+                    response = await client.post(OLLAMA_URL, json=payload)
+                    ans = response.json().get("response", "").strip()
 
         return {
             "status": "success",
             "source": "SQL Server (dbo.produtos)",
             "question": question,
-            "answer": response.json().get("response", "")
+            "answer": ans
         }
 
-    except requests.exceptions.RequestException as e:
-        raise HTTPException(status_code=500, detail=f"Erro no Ollama: {str(e)}")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erro ao consultar SQL Server: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Erro ao consultar SQL: {str(e)}")
