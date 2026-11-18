@@ -1,6 +1,16 @@
-
-# Python
-__pycache__/
-*.pyc
-.venv/
+# Arquivos de senhas e configurações locais
 .env
+*.env
+!.env.example
+
+# Ambientes virtuais Python (na raiz ou dentro de subpastas)
+.venv/
+venv/
+env/
+
+# Arquivos temporários do Python e do sistema
+__pycache__/
+*.py[cod]
+*.csv
+.nicegui/
+.vscode/
